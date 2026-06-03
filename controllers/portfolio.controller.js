@@ -2,8 +2,8 @@ import Portfolio from "../models/portfolio.model.js";
 import {
   buildPortfolioContactMail,
   isDuplicateContactMessage,
-  sendOptionalRawMail,
 } from "../utils/contact.helper.js";
+import { sendRawMail } from "../utils/mailer.js";
 import { toClientPortfolio } from "../utils/portfolio.mapper.js";
 import {
   buildPortfolioPayload,
@@ -213,13 +213,22 @@ export const sendPortfolioMessage = async (req, res, next) => {
       message,
     });
 
-    sendOptionalRawMail({
-      to: recipientEmail,
-      replyTo: senderEmail,
-      subject,
-      text,
-      html,
-    });
+    try {
+      await sendRawMail({
+        to: recipientEmail,
+        replyTo: senderEmail,
+        subject,
+        text,
+        html,
+      });
+    } catch (error) {
+      console.error("Failed to send portfolio contact email:", error.message);
+
+      return res.status(502).json({
+        success: false,
+        message: "Unable to send portfolio contact email. Please check SMTP configuration.",
+      });
+    }
 
     return res.status(200).json({
       success: true,

@@ -139,14 +139,23 @@ export const sendEmailOtp = async (req, res, next) => {
       await user.save();
     }
 
-    sendOptionalMail(
-      "email-otp",
-      {
-        "%name%": displayName || "User",
-        "%otp%": otp,
-      },
-      email
-    );
+    try {
+      await sendMail(
+        "email-otp",
+        {
+          "%name%": displayName || "User",
+          "%otp%": otp,
+        },
+        email
+      );
+    } catch (error) {
+      console.error("Failed to send OTP email:", error.message);
+
+      return res.status(502).json({
+        success: false,
+        message: "Unable to send OTP email. Please check SMTP configuration.",
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -302,14 +311,23 @@ export const forgotPassword = async (req, res, next) => {
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-    await sendMail(
-      "forgot-password",
-      {
-        "%name%": user.fullName,
-        "%resetLink%": resetUrl,
-      },
-      user.email
-    );
+    try {
+      await sendMail(
+        "forgot-password",
+        {
+          "%name%": user.fullName,
+          "%resetLink%": resetUrl,
+        },
+        user.email
+      );
+    } catch (error) {
+      console.error("Failed to send password reset email:", error.message);
+
+      return res.status(502).json({
+        success: false,
+        message: "Unable to send password reset email. Please check SMTP configuration.",
+      });
+    }
 
     res.status(200).json({
       success: true,
