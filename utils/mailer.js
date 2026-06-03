@@ -9,26 +9,33 @@ const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
 const getSmtpConfig = () => {
   const smtpEmail = process.env.SMTP_EMAIL?.trim();
   const smtpPassword = process.env.SMTP_PASSWORD?.replace(/\s/g, "");
+  const smtpHost = process.env.SMTP_HOST?.trim() || "smtp.gmail.com";
+  const smtpPort = Number(process.env.SMTP_PORT || 465);
+  const smtpSecure = String(process.env.SMTP_SECURE ?? "true").toLowerCase() !== "false";
 
   if (!smtpEmail || !smtpPassword) {
     throw new Error("SMTP_EMAIL and SMTP_PASSWORD are required");
   }
 
-  return { smtpEmail, smtpPassword };
+  if (!Number.isInteger(smtpPort)) {
+    throw new Error("SMTP_PORT must be a valid number");
+  }
+
+  return { smtpEmail, smtpPassword, smtpHost, smtpPort, smtpSecure };
 };
 
 const getTransporter = () => {
-  const { smtpEmail, smtpPassword } = getSmtpConfig();
-  const configKey = `${smtpEmail}:${smtpPassword}`;
+  const { smtpEmail, smtpPassword, smtpHost, smtpPort, smtpSecure } = getSmtpConfig();
+  const configKey = `${smtpEmail}:${smtpPassword}:${smtpHost}:${smtpPort}:${smtpSecure}`;
 
   if (transporter && transporterConfigKey === configKey) {
     return transporter;
   }
 
   transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
     pool: true,
     maxConnections: 3,
     maxMessages: 100,
@@ -47,8 +54,9 @@ const getTransporter = () => {
 
 const getFromAddress = () => {
   const { smtpEmail } = getSmtpConfig();
+  const fromName = process.env.SMTP_FROM_NAME?.trim() || "Portfolio Builder Studio";
 
-  return `Portfolio Builder Studio <${smtpEmail}>`;
+  return `${fromName} <${smtpEmail}>`;
 };
 
 const getMailTemplate = async (templateName) => {
