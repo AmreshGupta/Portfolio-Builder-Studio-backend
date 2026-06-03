@@ -1,98 +1,139 @@
 import nodemailer from "nodemailer";
 import mailTemplates from "../models/mailTemplate.js";
 
-let transporter;
+let transporter = null;
+let transporterConfigKey = "";
 const templateCache = new Map();
+const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-function getTransporter() {
-  if (transporter) {
+const getSmtpConfig = () => {
+  const smtpEmail = process.env.SMTP_EMAIL?.trim();
+  const smtpPassword = process.env.SMTP_PASSWORD?.replace(/\s/g, "");
+
+  if (!smtpEmail || !smtpPassword) {
+    throw new Error("SMTP_EMAIL and SMTP_PASSWORD are required");
+  }
+
+  return { smtpEmail, smtpPassword };
+};
+
+const getTransporter = () => {
+  const { smtpEmail, smtpPassword } = getSmtpConfig();
+  const configKey = `${smtpEmail}:${smtpPassword}`;
+
+  if (transporter && transporterConfigKey === configKey) {
     return transporter;
   }
 
-  if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
-    throw new Error("SMTP credentials are not configured");
-  }
-
   transporter = nodemailer.createTransport({
-    pool: true,
     host: "smtp.gmail.com",
     port: 465,
     secure: true,
-    maxConnections: 2,
+    pool: true,
+    maxConnections: 3,
     maxMessages: 100,
     connectionTimeout: 10000,
     greetingTimeout: 10000,
-    socketTimeout: 20000,
+    socketTimeout: 30000,
     auth: {
-      user: process.env.SMTP_EMAIL,
-      pass: process.env.SMTP_PASSWORD,
+      user: smtpEmail,
+      pass: smtpPassword,
     },
   });
+  transporterConfigKey = configKey;
 
   return transporter;
-}
+};
 
-function applyTemplateVariables(value = "", variables = {}) {
-  return Object.entries(variables).reduce((result, [key, replacement]) => {
-    return result?.replaceAll(key, replacement);
-  }, value);
-}
+const getFromAddress = () => {
+  const { smtpEmail } = getSmtpConfig();
 
-export const sendMail = async (templateName, mailVariables, email) => {
-  let template = templateCache.get(templateName);
+  return `Portfolio Builder Studio <${smtpEmail}>`;
+};
 
-  if (!template) {
-    template = await mailTemplates
-      .findOne({
-        templateEvent: templateName,
-        isDeleted: false,
-        active: true,
-      })
-      .lean(true);
+const getMailTemplate = async (templateName) => {
+  const cached = templateCache.get(templateName);
 
-    if (template) {
-      templateCache.set(templateName, template);
-    }
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.template;
   }
 
-  if (!template || (!template.subject && !template.htmlBody && !template.textBody)) {
+  const template = await mailTemplates
+    .findOne({
+      templateEvent: templateName,
+      isDeleted: false,
+      active: true,
+    })
+    .lean();
+
+  if (!template) {
     throw new Error(`Mail template not found: ${templateName}`);
   }
 
-  const subject = applyTemplateVariables(template.subject, mailVariables);
-  const html = applyTemplateVariables(template.htmlBody, mailVariables);
-  const text = applyTemplateVariables(template.textBody, mailVariables);
-
-  await getTransporter().sendMail({
-    from: process.env.SMTP_EMAIL,
-    to: email,
-    subject: subject || "Portfolio Builder",
-    text: text || "",
-    html: html || text || "",
+  templateCache.set(templateName, {
+    template,
+    expiresAt: Date.now() + TEMPLATE_CACHE_TTL_MS,
   });
+
+  return template;
+};
+
+const renderTemplate = (template, mailVariables = {}) => {
+  let subject = template.subject || "";
+  let html = template.htmlBody || "";
+  let text = template.textBody || "";
+
+  for (const key in mailVariables) {
+    const value = mailVariables[key] ?? "";
+    subject = subject.replaceAll(key, value);
+    html = html.replaceAll(key, value);
+    text = text.replaceAll(key, value);
+  }
+
+  return { subject, html, text };
+};
+
+export const verifyMailTransport = async () => {
+  await getTransporter().verify();
 
   return {
     type: "success",
-    message: "Mail successfully sent",
+    message: "SMTP connection verified",
   };
 };
 
-export const sendRawMail = async ({ to, replyTo, subject, text, html }) => {
-  if (!to) {
-    throw new Error("Recipient email is required");
+export const sendRawMail = async (mailOptions) => {
+  try {
+    const result = await getTransporter().sendMail({
+      from: getFromAddress(),
+      ...mailOptions,
+    });
+
+    if (result.rejected?.length) {
+      throw new Error(`Mail rejected for: ${result.rejected.join(", ")}`);
+    }
+
+    return {
+      type: "success",
+      message: "Mail successfully sent",
+      messageId: result.messageId,
+      accepted: result.accepted,
+    };
+  } catch (error) {
+    throw error;
   }
+};
 
-  await getTransporter().sendMail({
-    from: process.env.SMTP_EMAIL,
-    to,
-    replyTo,
-    subject: subject || "Portfolio message",
-    text: text || "",
-    html: html || "",
+export const sendMail = async (
+  templateName,
+  mailVariables,
+  email
+) => {
+  const template = await getMailTemplate(templateName);
+  const renderedMail = renderTemplate(template, mailVariables);
+
+  return sendRawMail({
+    to: email,
+    ...renderedMail,
   });
-
-  return {
-    type: "success",
-    message: "Mail successfully sent",
-  };
 };

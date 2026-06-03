@@ -1,16 +1,18 @@
 import User from "../models/user.model.js";
-import { sendMail } from "../utils/mailer.js";
-import crypto from "crypto";
-import bcrypt from "bcryptjs";
 
 import {
   hashPassword,
   comparePassword,
   generateToken,
   generateOTP,
+  generatePasswordResetToken,
+  hashResetToken,
+  normalizeOTP,
   hashOTP,
   verifyOTPAndPassword,
-  sendOptionalMail
+  sendOtpMail,
+  sendPasswordResetMail,
+  sendWelcomeMail,
 } from "../utils/auth.helper.js";
 
 import {
@@ -78,14 +80,7 @@ export const signup = async (req, res, next) => {
 
     await user.save();
 
-    sendOptionalMail(
-      "welcome-user",
-      {
-        "%name%": displayName,
-        "%websiteLink%": process.env.FRONTEND_URL,
-      },
-      email
-    );
+    sendWelcomeMail({ name: displayName, email });
 
     return res.status(201).json({
       success: true,
@@ -140,16 +135,9 @@ export const sendEmailOtp = async (req, res, next) => {
     }
 
     try {
-      await sendMail(
-        "email-otp",
-        {
-          "%name%": displayName || "User",
-          "%otp%": otp,
-        },
-        email
-      );
+      await sendOtpMail({ name: displayName, otp, email });
     } catch (error) {
-      console.error("Failed to send OTP email:", error.message);
+      console.error("Failed to send email OTP:", error.message);
 
       return res.status(502).json({
         success: false,
@@ -170,12 +158,19 @@ export const sendEmailOtp = async (req, res, next) => {
 export const verifyEmailOtp = async (req, res, next) => {
   try {
     const email = normalizeEmail(req.body.email);
-    const { otp } = req.body;
+    const otp = normalizeOTP(req.body.otp);
 
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
         message: "Email and OTP are required",
+      });
+    }
+
+    if (otp.length !== 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid 6-digit OTP",
       });
     }
 
@@ -203,7 +198,7 @@ export const verifyEmailOtp = async (req, res, next) => {
     if (!isOtpValid) {
       return res.status(400).json({
         success: false,
-        message: "Invalid OTP",
+        message: "Invalid OTP. Please enter the latest OTP sent to your email.",
       });
     }
 
@@ -297,29 +292,19 @@ export const forgotPassword = async (req, res, next) => {
       });
     }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
-
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    const { resetToken, hashedToken } = generatePasswordResetToken();
 
     user.resetPasswordToken = hashedToken;
     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
 
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-
     try {
-      await sendMail(
-        "forgot-password",
-        {
-          "%name%": user.fullName,
-          "%resetLink%": resetUrl,
-        },
-        user.email
-      );
+      await sendPasswordResetMail({
+        name: user.fullName,
+        resetToken,
+        email: user.email,
+      });
     } catch (error) {
       console.error("Failed to send password reset email:", error.message);
 
@@ -352,10 +337,7 @@ export const resetPassword = async (req, res, next) => {
       });
     }
 
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(token)
-      .digest("hex");
+    const hashedToken = hashResetToken(token);
 
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
@@ -369,7 +351,7 @@ export const resetPassword = async (req, res, next) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await hashPassword(password);
 
     user.password = hashedPassword;
     user.token = null;

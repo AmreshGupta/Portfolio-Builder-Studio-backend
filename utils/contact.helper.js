@@ -24,14 +24,14 @@ export function isDuplicateContactMessage(messageData) {
   const key = getMessageKey(messageData);
   const expiresAt = duplicateMessages.get(key);
 
-  if (expiresAt && expiresAt > now) {
-    return true;
-  }
+  return Boolean(expiresAt && expiresAt > now);
+}
 
+export function markContactMessageSent(messageData) {
+  const key = getMessageKey(messageData);
+  const now = Date.now();
   duplicateMessages.set(key, now + DUPLICATE_WINDOW_MS);
   setTimeout(() => duplicateMessages.delete(key), DUPLICATE_WINDOW_MS).unref?.();
-
-  return false;
 }
 
 export function buildPortfolioContactMail({
