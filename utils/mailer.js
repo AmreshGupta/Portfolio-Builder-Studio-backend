@@ -5,44 +5,6 @@ let transporter = null;
 let transporterConfigKey = "";
 const templateCache = new Map();
 const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
-const FALLBACK_TEMPLATES = {
-  "email-otp": {
-    subject: "Verify Your Email - Portfolio Builder Studio",
-    htmlBody: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>Verify your email</h2>
-        <p>Hello %name%,</p>
-        <p>Your OTP for Portfolio Builder Studio is:</p>
-        <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">%otp%</p>
-        <p>This OTP is valid for 5 minutes.</p>
-      </div>
-    `,
-    textBody: "Hello %name%, your OTP for Portfolio Builder Studio is %otp%. This OTP is valid for 5 minutes.",
-  },
-  "forgot-password": {
-    subject: "Reset Your Password - Portfolio Builder Studio",
-    htmlBody: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>Reset your password</h2>
-        <p>Hello %name%,</p>
-        <p>Use this link to reset your password:</p>
-        <p><a href="%resetLink%">Reset Password</a></p>
-      </div>
-    `,
-    textBody: "Hello %name%, use this link to reset your password: %resetLink%",
-  },
-  "welcome-user": {
-    subject: "Welcome to Portfolio Builder Studio",
-    htmlBody: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>Welcome, %name%</h2>
-        <p>Your Portfolio Builder Studio account is ready.</p>
-        <p><a href="%websiteLink%">Open Portfolio Builder Studio</a></p>
-      </div>
-    `,
-    textBody: "Welcome, %name%. Your Portfolio Builder Studio account is ready: %websiteLink%",
-  },
-};
 
 const getSmtpConfig = () => {
   const smtpEmail = process.env.SMTP_EMAIL?.trim();
@@ -77,9 +39,9 @@ const getTransporter = () => {
     pool: true,
     maxConnections: 3,
     maxMessages: 100,
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 30000,
+    connectionTimeout: 60000,
+    greetingTimeout: 60000,
+    socketTimeout: 120000,
     auth: {
       user: smtpEmail,
       pass: smtpPassword,
@@ -113,13 +75,7 @@ const getMailTemplate = async (templateName) => {
     .lean();
 
   if (!template) {
-    const fallbackTemplate = FALLBACK_TEMPLATES[templateName];
-
-    if (!fallbackTemplate) {
-      throw new Error(`Mail template not found: ${templateName}`);
-    }
-
-    return fallbackTemplate;
+    throw new Error(`Mail template not found: ${templateName}`);
   }
 
   templateCache.set(templateName, {

@@ -141,7 +141,7 @@ export const sendEmailOtp = async (req, res, next) => {
 
       return res.status(502).json({
         success: false,
-        message: "Unable to send OTP email. Please check SMTP configuration.",
+        message: "Unable to send OTP email right now. Please try again in a minute.",
       });
     }
 
@@ -310,7 +310,7 @@ export const forgotPassword = async (req, res, next) => {
 
       return res.status(502).json({
         success: false,
-        message: "Unable to send password reset email. Please check SMTP configuration.",
+        message: "Unable to send password reset email right now. Please try again in a minute.",
       });
     }
 
