@@ -1,17 +1,35 @@
 import nodemailer from "nodemailer";
 import mailTemplates from "../models/mailTemplate.js";
 
-function createTransporter() {
-  return nodemailer.createTransport({
+let transporter;
+const templateCache = new Map();
+
+function getTransporter() {
+  if (transporter) {
+    return transporter;
+  }
+
+  if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
+    throw new Error("SMTP credentials are not configured");
+  }
+
+  transporter = nodemailer.createTransport({
     pool: true,
     host: "smtp.gmail.com",
     port: 465,
     secure: true,
+    maxConnections: 2,
+    maxMessages: 100,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
     auth: {
       user: process.env.SMTP_EMAIL,
       pass: process.env.SMTP_PASSWORD,
     },
   });
+
+  return transporter;
 }
 
 function applyTemplateVariables(value = "", variables = {}) {
@@ -21,13 +39,21 @@ function applyTemplateVariables(value = "", variables = {}) {
 }
 
 export const sendMail = async (templateName, mailVariables, email) => {
-  const template = await mailTemplates
-    .findOne({
-      templateEvent: templateName,
-      isDeleted: false,
-      active: true,
-    })
-    .lean(true);
+  let template = templateCache.get(templateName);
+
+  if (!template) {
+    template = await mailTemplates
+      .findOne({
+        templateEvent: templateName,
+        isDeleted: false,
+        active: true,
+      })
+      .lean(true);
+
+    if (template) {
+      templateCache.set(templateName, template);
+    }
+  }
 
   if (!template || (!template.subject && !template.htmlBody && !template.textBody)) {
     throw new Error(`Mail template not found: ${templateName}`);
@@ -37,7 +63,7 @@ export const sendMail = async (templateName, mailVariables, email) => {
   const html = applyTemplateVariables(template.htmlBody, mailVariables);
   const text = applyTemplateVariables(template.textBody, mailVariables);
 
-  await createTransporter().sendMail({
+  await getTransporter().sendMail({
     from: process.env.SMTP_EMAIL,
     to: email,
     subject: subject || "Portfolio Builder",
@@ -56,7 +82,7 @@ export const sendRawMail = async ({ to, replyTo, subject, text, html }) => {
     throw new Error("Recipient email is required");
   }
 
-  await createTransporter().sendMail({
+  await getTransporter().sendMail({
     from: process.env.SMTP_EMAIL,
     to,
     replyTo,

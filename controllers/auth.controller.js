@@ -9,7 +9,8 @@ import {
   generateToken,
   generateOTP,
   hashOTP,
-  verifyOTPAndPassword
+  verifyOTPAndPassword,
+  sendOptionalMail
 } from "../utils/auth.helper.js";
 
 import {
@@ -29,14 +30,6 @@ function toAuthUser(user) {
     email: user.email,
     token: user.token,
   };
-}
-
-async function sendOptionalMail(templateName, variables, email) {
-  try {
-    await sendMail(templateName, variables, email);
-  } catch (error) {
-    console.error(`Failed to send ${templateName} email:`, error.message);
-  }
 }
 
 export const signup = async (req, res, next) => {
@@ -146,7 +139,7 @@ export const sendEmailOtp = async (req, res, next) => {
       await user.save();
     }
 
-    await sendMail(
+    sendOptionalMail(
       "email-otp",
       {
         "%name%": displayName || "User",
@@ -157,7 +150,7 @@ export const sendEmailOtp = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully",
+      message: "OTP is being sent successfully",
     });
 
   } catch (error) {

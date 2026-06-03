@@ -1,6 +1,9 @@
 import Portfolio from "../models/portfolio.model.js";
-import { sendRawMail } from "../utils/mailer.js";
-import { escapeHtml } from "../utils/html.js";
+import {
+  buildPortfolioContactMail,
+  isDuplicateContactMessage,
+  sendOptionalRawMail,
+} from "../utils/contact.helper.js";
 import { toClientPortfolio } from "../utils/portfolio.mapper.js";
 import {
   buildPortfolioPayload,
@@ -189,36 +192,28 @@ export const sendPortfolioMessage = async (req, res, next) => {
     const { name: senderName, email: senderEmail, message } = messageData;
 
     const ownerName = getFirst(portfolio.hero).fullName || "Portfolio owner";
-    const subject = `New portfolio message from ${senderName}`;
-    const text = [
-      `Hi ${ownerName},`,
-      "",
-      "You received a new message from your portfolio contact form.",
-      "",
-      `Name: ${senderName}`,
-      `Email: ${senderEmail}`,
-      "",
-      "Message:",
+    const isDuplicate = isDuplicateContactMessage({
+      slug: req.params.slug,
+      recipientEmail,
+      senderEmail,
       message,
-    ].join("\n");
+    });
 
-    const safeOwnerName = escapeHtml(ownerName);
-    const safeSenderName = escapeHtml(senderName);
-    const safeSenderEmail = escapeHtml(senderEmail);
-    const safeMessage = escapeHtml(message).replace(/\n/g, "<br />");
+    if (isDuplicate) {
+      return res.status(429).json({
+        success: false,
+        message: "This message was already sent. Please wait before sending again.",
+      });
+    }
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-        <p>Hi ${safeOwnerName},</p>
-        <p>You received a new message from your portfolio contact form.</p>
-        <p><strong>Name:</strong> ${safeSenderName}</p>
-        <p><strong>Email:</strong> ${safeSenderEmail}</p>
-        <p><strong>Message:</strong></p>
-        <p>${safeMessage}</p>
-      </div>
-    `;
+    const { subject, text, html } = buildPortfolioContactMail({
+      ownerName,
+      senderName,
+      senderEmail,
+      message,
+    });
 
-    await sendRawMail({
+    sendOptionalRawMail({
       to: recipientEmail,
       replyTo: senderEmail,
       subject,
@@ -228,7 +223,7 @@ export const sendPortfolioMessage = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "Message sent successfully",
+      message: "Message is being sent successfully",
     });
   } catch (error) {
     next(error);

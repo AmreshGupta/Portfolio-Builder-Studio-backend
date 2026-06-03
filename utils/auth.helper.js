@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { sendMail } from "./mailer.js";
 
 export const hashPassword = async (password) => {
   return await bcrypt.hash(password, 12);
@@ -43,4 +44,12 @@ export const verifyOTPAndPassword = async (otp, hashedOTP) => {
     .digest("hex");
 
   return hashedEnteredOtp === hashedOTP;
+};
+
+export const sendOptionalMail = async (templateName, variables, email) => {
+  try {
+    await sendMail(templateName, variables, email);
+  } catch (error) {
+    console.error(`Failed to send ${templateName} email:`, error.message);
+  }
 };

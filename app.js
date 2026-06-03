@@ -54,6 +54,10 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
+app.get("/", (_req, res) => {
+  res.send("Backend is running successfully");
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/portfolio", portfolioRoutes);
 

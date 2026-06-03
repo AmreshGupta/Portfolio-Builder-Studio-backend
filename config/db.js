@@ -5,6 +5,10 @@ import bcrypt from "bcryptjs";
 
 const connectDB = async () => {
   try {
+    if (!process.env.CONNECTION_STRING) {
+      throw new Error("CONNECTION_STRING is missing");
+    }
+
     const connect = await mongoose.connect(process.env.CONNECTION_STRING);
     console.log(
       `Database connected successfully:\nHost: ${connect.connection.host}\nName: ${connect.connection.name}`,
