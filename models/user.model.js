@@ -4,27 +4,48 @@ const userSchema = new mongoose.Schema(
   {
     fullName: {
       type: String,
-      required: true
+      trim: true,
     },
 
     email: {
       type: String,
       required: true,
-      unique: true
+      trim: true,
+      lowercase: true,
+      unique: true,
     },
 
     password: {
       type: String,
-      required: true
     },
-     token: {
-    type: String,
-    default: null
-  }
+    token: {
+      type: String,
+      default: null,
+    },
+    resetPasswordToken: {
+      type: String,
+    },
+
+    resetPasswordExpire: {
+      type: Date,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    emailOtp: {
+      type: String,
+    },
+
+    emailOtpExpiry: {
+      type: Date,
+    },
   },
+
   {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 );
 
 const User = mongoose.model("User", userSchema);

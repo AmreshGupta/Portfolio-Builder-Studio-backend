@@ -26,6 +26,13 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
+    if (user.token && user.token !== token) {
+      return res.status(401).json({
+        success: false,
+        message: "Session expired. Please login again"
+      });
+    }
+
     req.user = user;
 
     next();

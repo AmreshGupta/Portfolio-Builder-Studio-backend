@@ -1,12 +1,14 @@
-const errorMiddleware = (err, req, res, next) => {
+const errorMiddleware = (err, _req, res, _next) => {
+  const statusCode = err.name === "MulterError" ? 400 : err.statusCode || err.status || 500;
 
-  console.log(err);
+  if (process.env.NODE_ENV !== "production") {
+    console.error(err);
+  }
 
-  res.status(500).json({
+  res.status(statusCode).json({
     success: false,
-    message: err.message || "Server Error"
+    message: statusCode === 500 ? "Server Error" : err.message,
   });
-
 };
 
 export default errorMiddleware;

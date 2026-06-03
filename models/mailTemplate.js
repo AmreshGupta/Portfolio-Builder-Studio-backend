@@ -1,0 +1,46 @@
+import mongoose from "mongoose";
+
+const mailTemplateSchema = new mongoose.Schema(
+  {
+    templateEvent: {
+      type: String,
+      unique: true,
+    },
+    active: {
+      type: Boolean,
+      default: true,
+    },
+    subject: {
+      type: String,
+    },
+    mailVariables: {
+      type: String,
+    },
+    htmlBody: {
+      type: String,
+    },
+    textBody: {
+      type: String,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const MailTemplates = mongoose.model(
+  "mailTemplates",
+  mailTemplateSchema
+);
+
+export default MailTemplates;
