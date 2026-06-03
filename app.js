@@ -20,9 +20,19 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
 
-const allowedOrigins = [
+const envOrigins = [
   process.env.CLIENT_URL,
   process.env.FRONTEND_URL,
+  process.env.CORS_ORIGINS,
+]
+  .filter(Boolean)
+  .flatMap((origin) => origin.split(","))
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = [
+  ...envOrigins,
+  "https://portfolio-builder-studio.vercel.app",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://localhost:5174",
