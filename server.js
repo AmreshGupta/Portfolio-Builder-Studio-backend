@@ -8,3 +8,12 @@ connectDB();
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+import { verifyMailTransport } from "./utils/mailer.js";
+
+verifyMailTransport()
+  .then(() => {
+    console.log("Mail Service Ready");
+  })
+  .catch((err) => {
+    console.error(err.message);
+  });
