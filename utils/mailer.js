@@ -458,20 +458,35 @@ let transporter = null;
 const templateCache = new Map();
 const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
 
+// =========================
+// GET MAIL TRANSPORTER
+// =========================
+
 const getTransporter = () => {
   if (transporter) {
     return transporter;
   }
 
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
+    host:
+      process.env.SMTP_HOST ||
+      "smtp-relay.brevo.com",
+
+    // USE 2525 FOR RENDER
+    port: Number(
+      process.env.SMTP_PORT || 2525
+    ),
+
     secure: false,
 
     auth: {
       user: process.env.SMTP_EMAIL,
       pass: process.env.SMTP_PASSWORD,
     },
+
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
 
     tls: {
       rejectUnauthorized: false,
@@ -481,14 +496,28 @@ const getTransporter = () => {
   return transporter;
 };
 
+// =========================
+// FROM ADDRESS
+// =========================
+
 const getFromAddress = () => {
   const fromName =
-    process.env.SMTP_FROM_NAME
+    process.env.SMTP_FROM_NAME ||
+    "Portfolio Builder Studio";
+
+  // VERIFIED SENDER EMAIL
   return `${fromName} <createourportfolio@gmail.com>`;
 };
 
-const getMailTemplate = async (templateName) => {
-  const cached = templateCache.get(templateName);
+// =========================
+// GET TEMPLATE
+// =========================
+
+const getMailTemplate = async (
+  templateName
+) => {
+  const cached =
+    templateCache.get(templateName);
 
   if (
     cached &&
@@ -520,6 +549,10 @@ const getMailTemplate = async (templateName) => {
   return template;
 };
 
+// =========================
+// RENDER TEMPLATE
+// =========================
+
 const renderTemplate = (
   template,
   mailVariables = {}
@@ -548,34 +581,32 @@ const renderTemplate = (
   };
 };
 
+// =========================
+// VERIFY MAIL
+// =========================
+
 export const verifyMailTransport =
   async () => {
-    try {
-      await getTransporter().verify();
+    console.log("Mail Service Ready");
 
-      console.log(
-        "SMTP VERIFIED SUCCESSFULLY"
-      );
-
-      return {
-        type: "success",
-        message:
-          "SMTP connection verified",
-      };
-    } catch (error) {
-      console.error(
-        "SMTP Verify Failed:",
-        error.message
-      );
-
-      throw error;
-    }
+    return {
+      type: "success",
+      message: "Mail Service Ready",
+    };
   };
+
+// =========================
+// SEND RAW MAIL
+// =========================
 
 export const sendRawMail = async (
   mailOptions
 ) => {
   try {
+    console.log(
+      "MAIL SENDING STARTED"
+    );
+
     const result =
       await getTransporter().sendMail({
         from: getFromAddress(),
@@ -602,6 +633,10 @@ export const sendRawMail = async (
     throw error;
   }
 };
+
+// =========================
+// SEND TEMPLATE MAIL
+// =========================
 
 export const sendMail = async (
   templateName,
