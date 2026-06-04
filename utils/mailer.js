@@ -454,109 +454,46 @@ import nodemailer from "nodemailer";
 import mailTemplates from "../models/mailTemplate.js";
 
 let transporter = null;
-let transporterConfigKey = "";
 
 const templateCache = new Map();
 const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-const getSmtpConfig = () => {
-  const smtpEmail = process.env.SMTP_EMAIL?.trim();
-
-  // Remove spaces from app password
-  const smtpPassword = process.env.SMTP_PASSWORD?.replace(/\s/g, "");
-
-  // Gmail SMTP
-  const smtpHost =
-    process.env.SMTP_HOST?.trim() || "smtp.gmail.com";
-
-  // Use 587 instead of 465
-  const smtpPort = Number(process.env.SMTP_PORT || 587);
-
-  // Must be false for port 587
-  const smtpSecure = false;
-
-  if (!smtpEmail || !smtpPassword) {
-    throw new Error(
-      "SMTP_EMAIL and SMTP_PASSWORD are required"
-    );
-  }
-
-  if (!Number.isInteger(smtpPort)) {
-    throw new Error("SMTP_PORT must be a valid number");
-  }
-
-  return {
-    smtpEmail,
-    smtpPassword,
-    smtpHost,
-    smtpPort,
-    smtpSecure,
-  };
-};
-
 const getTransporter = () => {
-  const {
-    smtpEmail,
-    smtpPassword,
-    smtpHost,
-    smtpPort,
-    smtpSecure,
-  } = getSmtpConfig();
-
-  const configKey = `${smtpEmail}:${smtpPassword}:${smtpHost}:${smtpPort}:${smtpSecure}`;
-
-  if (
-    transporter &&
-    transporterConfigKey === configKey
-  ) {
+  if (transporter) {
     return transporter;
   }
 
   transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
-
-    // FIX FOR RENDER IPV6 ISSUE
-    family: 4,
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    secure: false,
 
     auth: {
-      user: smtpEmail,
-      pass: smtpPassword,
+      user: process.env.SMTP_EMAIL,
+      pass: process.env.SMTP_PASSWORD,
     },
 
     tls: {
       rejectUnauthorized: false,
     },
-
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
-
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 60000,
   });
-
-  transporterConfigKey = configKey;
 
   return transporter;
 };
 
 const getFromAddress = () => {
-  const { smtpEmail } = getSmtpConfig();
-
   const fromName =
-    process.env.SMTP_FROM_NAME?.trim() ||
-    "Portfolio Builder Studio";
-
-  return `${fromName} <${smtpEmail}>`;
+    process.env.SMTP_FROM_NAME
+  return `${fromName} <createourportfolio@gmail.com>`;
 };
 
 const getMailTemplate = async (templateName) => {
   const cached = templateCache.get(templateName);
 
-  if (cached && cached.expiresAt > Date.now()) {
+  if (
+    cached &&
+    cached.expiresAt > Date.now()
+  ) {
     return cached.template;
   }
 
@@ -576,7 +513,8 @@ const getMailTemplate = async (templateName) => {
 
   templateCache.set(templateName, {
     template,
-    expiresAt: Date.now() + TEMPLATE_CACHE_TTL_MS,
+    expiresAt:
+      Date.now() + TEMPLATE_CACHE_TTL_MS,
   });
 
   return template;
@@ -593,8 +531,13 @@ const renderTemplate = (
   for (const key in mailVariables) {
     const value = mailVariables[key] ?? "";
 
-    subject = subject.replaceAll(key, value);
+    subject = subject.replaceAll(
+      key,
+      value
+    );
+
     html = html.replaceAll(key, value);
+
     text = text.replaceAll(key, value);
   }
 
@@ -605,50 +548,48 @@ const renderTemplate = (
   };
 };
 
-export const verifyMailTransport = async () => {
-  try {
-    await getTransporter().verify();
+export const verifyMailTransport =
+  async () => {
+    try {
+      await getTransporter().verify();
 
-    console.log(
-      "SMTP CONNECTION VERIFIED SUCCESSFULLY"
-    );
+      console.log(
+        "SMTP VERIFIED SUCCESSFULLY"
+      );
 
-    return {
-      type: "success",
-      message: "SMTP connection verified",
-    };
-  } catch (error) {
-    console.error(
-      "SMTP Verify Failed:",
-      error.message
-    );
+      return {
+        type: "success",
+        message:
+          "SMTP connection verified",
+      };
+    } catch (error) {
+      console.error(
+        "SMTP Verify Failed:",
+        error.message
+      );
 
-    throw error;
-  }
-};
+      throw error;
+    }
+  };
 
 export const sendRawMail = async (
   mailOptions
 ) => {
   try {
-    const result = await getTransporter().sendMail({
-      from: getFromAddress(),
-      ...mailOptions,
-    });
+    const result =
+      await getTransporter().sendMail({
+        from: getFromAddress(),
+        ...mailOptions,
+      });
 
-    if (result.rejected?.length) {
-      throw new Error(
-        `Mail rejected for: ${result.rejected.join(
-          ", "
-        )}`
-      );
-    }
-
-    console.log("MAIL SENT SUCCESSFULLY");
+    console.log(
+      "MAIL SENT SUCCESSFULLY"
+    );
 
     return {
       type: "success",
-      message: "Mail successfully sent",
+      message:
+        "Mail successfully sent",
       messageId: result.messageId,
       accepted: result.accepted,
     };
@@ -669,12 +610,15 @@ export const sendMail = async (
 ) => {
   try {
     const template =
-      await getMailTemplate(templateName);
+      await getMailTemplate(
+        templateName
+      );
 
-    const renderedMail = renderTemplate(
-      template,
-      mailVariables
-    );
+    const renderedMail =
+      renderTemplate(
+        template,
+        mailVariables
+      );
 
     return sendRawMail({
       to: email,
