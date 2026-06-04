@@ -168,12 +168,14 @@ const stripWrappingQuotes = (value = "") => {
   return trimmed;
 };
 
-const cleanSecret = (value = "") => stripWrappingQuotes(value).replace(/\s/g, "");
+const cleanSecret = (value = "") =>
+  stripWrappingQuotes(value).replace(/\s/g, "");
 
 const fallbackTemplates = {
   "email-otp": {
     subject: "Verify Your Email - Portfolio Builder Studio",
-    textBody: "Your Portfolio Builder Studio verification OTP is %otp%. It expires in 5 minutes.",
+    textBody:
+      "Your Portfolio Builder Studio verification OTP is %otp%. It expires in 5 minutes.",
     htmlBody: `
       <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827">
         <h2>Verify your email</h2>
@@ -214,11 +216,15 @@ const fallbackTemplates = {
 
 const getSmtpConfig = () => {
   const smtpEmail = stripWrappingQuotes(process.env.SMTP_EMAIL);
-  const smtpPassword = stripWrappingQuotes(process.env.SMTP_PASSWORD).replace(/\s/g, "");
+  const smtpPassword = stripWrappingQuotes(process.env.SMTP_PASSWORD).replace(
+    /\s/g,
+    "",
+  );
 
-  const smtpHost = stripWrappingQuotes(process.env.SMTP_HOST) || "smtp.gmail.com";
+  const smtpHost =
+    stripWrappingQuotes(process.env.SMTP_HOST) || "smtp.gmail.com";
 
-  const smtpPort = Number(process.env.SMTP_PORT || 587);
+  const smtpPort = Number(process.env.SMTP_PORT || 465);
 
   const smtpSecure =
     process.env.SMTP_SECURE === undefined
@@ -247,13 +253,8 @@ const getSmtpConfig = () => {
 // ======================
 
 const getTransporter = () => {
-  const {
-    smtpEmail,
-    smtpPassword,
-    smtpHost,
-    smtpPort,
-    smtpSecure,
-  } = getSmtpConfig();
+  const { smtpEmail, smtpPassword, smtpHost, smtpPort, smtpSecure } =
+    getSmtpConfig();
 
   const configKey = `${smtpEmail}:${smtpPassword}:${smtpHost}:${smtpPort}:${smtpSecure}`;
 
@@ -271,10 +272,9 @@ const getTransporter = () => {
       pass: smtpPassword,
     },
 
-    // FAST & STABLE
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
   });
 
   transporterConfigKey = configKey;
@@ -290,7 +290,8 @@ const getFromAddress = () => {
   const { smtpEmail } = getSmtpConfig();
 
   const fromName =
-    stripWrappingQuotes(process.env.SMTP_FROM_NAME) || "Portfolio Builder Studio";
+    stripWrappingQuotes(process.env.SMTP_FROM_NAME) ||
+    "Portfolio Builder Studio";
 
   return `${fromName} <${smtpEmail}>`;
 };
@@ -357,7 +358,9 @@ const sendWithSendGrid = async (mailOptions) => {
   }
 
   const { fromEmail, fromName } = getHttpMailFrom();
-  const recipients = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
+  const recipients = Array.isArray(mailOptions.to)
+    ? mailOptions.to
+    : [mailOptions.to];
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
@@ -374,7 +377,9 @@ const sendWithSendGrid = async (mailOptions) => {
         email: fromEmail,
         name: fromName,
       },
-      reply_to: mailOptions.replyTo ? { email: mailOptions.replyTo } : undefined,
+      reply_to: mailOptions.replyTo
+        ? { email: mailOptions.replyTo }
+        : undefined,
       subject: mailOptions.subject,
       content: [
         {
@@ -463,7 +468,9 @@ const getMailTemplate = async (templateName) => {
       throw new Error(`Mail template not found: ${templateName}`);
     }
 
-    console.warn(`Mail template not found in DB, using fallback: ${templateName}`);
+    console.warn(
+      `Mail template not found in DB, using fallback: ${templateName}`,
+    );
 
     return fallbackTemplate;
   }
@@ -513,7 +520,11 @@ export const sendRawMail = async (mailOptions) => {
     const httpResult = await sendWithHttpProvider(mailOptions);
 
     if (httpResult) {
-      console.log(" Mail Sent:", httpResult.provider, httpResult.messageId || "");
+      console.log(
+        " Mail Sent:",
+        httpResult.provider,
+        httpResult.messageId || "",
+      );
 
       return httpResult;
     }
@@ -524,9 +535,7 @@ export const sendRawMail = async (mailOptions) => {
     });
 
     if (result.rejected?.length) {
-      throw new Error(
-        `Mail rejected for: ${result.rejected.join(", ")}`
-      );
+      throw new Error(`Mail rejected for: ${result.rejected.join(", ")}`);
     }
 
     console.log(" Mail Sent:", result.messageId);
@@ -548,18 +557,11 @@ export const sendRawMail = async (mailOptions) => {
 // TEMPLATE MAIL SEND
 // ======================
 
-export const sendMail = async (
-  templateName,
-  mailVariables,
-  email
-) => {
+export const sendMail = async (templateName, mailVariables, email) => {
   try {
     const template = await getMailTemplate(templateName);
 
-    const renderedMail = renderTemplate(
-      template,
-      mailVariables
-    );
+    const renderedMail = renderTemplate(template, mailVariables);
 
     return await sendRawMail({
       to: email,
