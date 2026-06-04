@@ -168,6 +168,8 @@ const stripWrappingQuotes = (value = "") => {
   return trimmed;
 };
 
+const cleanSecret = (value = "") => stripWrappingQuotes(value).replace(/\s/g, "");
+
 const fallbackTemplates = {
   "email-otp": {
     subject: "Verify Your Email - Portfolio Builder Studio",
@@ -310,7 +312,7 @@ const getHttpMailFrom = () => {
 };
 
 const sendWithResend = async (mailOptions) => {
-  const apiKey = stripWrappingQuotes(process.env.RESEND_API_KEY);
+  const apiKey = cleanSecret(process.env.RESEND_API_KEY);
 
   if (!apiKey) {
     return null;
@@ -348,7 +350,7 @@ const sendWithResend = async (mailOptions) => {
 };
 
 const sendWithSendGrid = async (mailOptions) => {
-  const apiKey = stripWrappingQuotes(process.env.SENDGRID_API_KEY);
+  const apiKey = cleanSecret(process.env.SENDGRID_API_KEY);
 
   if (!apiKey) {
     return null;
