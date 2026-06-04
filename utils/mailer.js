@@ -515,44 +515,65 @@ const renderTemplate = (template, mailVariables = {}) => {
 // RAW MAIL SEND
 // ======================
 
+// export const sendRawMail = async (mailOptions) => {
+//   try {
+//     const httpResult = await sendWithHttpProvider(mailOptions);
+
+//     if (httpResult) {
+//       console.log(
+//         " Mail Sent:",
+//         httpResult.provider,
+//         httpResult.messageId || "",
+//       );
+
+//       return httpResult;
+//     }
+
+//     const result = await getTransporter().sendMail({
+//       from: getFromAddress(),
+//       ...mailOptions,
+//     });
+
+//     if (result.rejected?.length) {
+//       throw new Error(`Mail rejected for: ${result.rejected.join(", ")}`);
+//     }
+
+//     console.log(" Mail Sent:", result.messageId);
+
+//     return {
+//       success: true,
+//       message: "Mail sent successfully",
+//       messageId: result.messageId,
+//       accepted: result.accepted,
+//     };
+//   } catch (error) {
+//     console.error(" Mail Send Failed:", error.message);
+
+//     throw new Error(`Failed to send email: ${error.message}`);
+//   }
+// };
+
 export const sendRawMail = async (mailOptions) => {
   try {
-    const httpResult = await sendWithHttpProvider(mailOptions);
 
-    if (httpResult) {
-      console.log(
-        " Mail Sent:",
-        httpResult.provider,
-        httpResult.messageId || "",
-      );
+    // RESEND FIRST
+    const resendResult = await sendWithResend(mailOptions);
 
-      return httpResult;
+    if (resendResult) {
+      console.log("Mail Sent With Resend");
+
+      return resendResult;
     }
 
-    const result = await getTransporter().sendMail({
-      from: getFromAddress(),
-      ...mailOptions,
-    });
+    throw new Error("No email provider configured");
 
-    if (result.rejected?.length) {
-      throw new Error(`Mail rejected for: ${result.rejected.join(", ")}`);
-    }
-
-    console.log(" Mail Sent:", result.messageId);
-
-    return {
-      success: true,
-      message: "Mail sent successfully",
-      messageId: result.messageId,
-      accepted: result.accepted,
-    };
   } catch (error) {
-    console.error(" Mail Send Failed:", error.message);
+
+    console.error("Mail Send Failed:", error.message);
 
     throw new Error(`Failed to send email: ${error.message}`);
   }
 };
-
 // ======================
 // TEMPLATE MAIL SEND
 // ======================
