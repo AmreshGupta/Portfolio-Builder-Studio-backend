@@ -293,6 +293,127 @@ const getFromAddress = () => {
   return `${fromName} <${smtpEmail}>`;
 };
 
+const getHttpMailFrom = () => {
+  const fromEmail =
+    stripWrappingQuotes(process.env.MAIL_FROM_EMAIL) ||
+    stripWrappingQuotes(process.env.SMTP_EMAIL);
+  const fromName =
+    stripWrappingQuotes(process.env.MAIL_FROM_NAME) ||
+    stripWrappingQuotes(process.env.SMTP_FROM_NAME) ||
+    "Portfolio Builder Studio";
+
+  if (!fromEmail) {
+    throw new Error("MAIL_FROM_EMAIL or SMTP_EMAIL is required");
+  }
+
+  return { fromEmail, fromName, formatted: `${fromName} <${fromEmail}>` };
+};
+
+const sendWithResend = async (mailOptions) => {
+  const apiKey = stripWrappingQuotes(process.env.RESEND_API_KEY);
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const { formatted } = getHttpMailFrom();
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: formatted,
+      to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to],
+      subject: mailOptions.subject,
+      html: mailOptions.html,
+      text: mailOptions.text,
+      reply_to: mailOptions.replyTo,
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || "Resend email API failed");
+  }
+
+  return {
+    success: true,
+    message: "Mail sent successfully",
+    messageId: data?.id,
+    provider: "resend",
+  };
+};
+
+const sendWithSendGrid = async (mailOptions) => {
+  const apiKey = stripWrappingQuotes(process.env.SENDGRID_API_KEY);
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const { fromEmail, fromName } = getHttpMailFrom();
+  const recipients = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: [
+        {
+          to: recipients.map((email) => ({ email })),
+        },
+      ],
+      from: {
+        email: fromEmail,
+        name: fromName,
+      },
+      reply_to: mailOptions.replyTo ? { email: mailOptions.replyTo } : undefined,
+      subject: mailOptions.subject,
+      content: [
+        {
+          type: "text/plain",
+          value: mailOptions.text || "",
+        },
+        {
+          type: "text/html",
+          value: mailOptions.html || mailOptions.text || "",
+        },
+      ],
+    }),
+  });
+
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(responseText || "SendGrid email API failed");
+  }
+
+  return {
+    success: true,
+    message: "Mail sent successfully",
+    provider: "sendgrid",
+  };
+};
+
+const sendWithHttpProvider = async (mailOptions) => {
+  const senders = [sendWithSendGrid, sendWithResend];
+
+  for (const send of senders) {
+    const result = await send(mailOptions);
+
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
+};
+
 // ======================
 // VERIFY SMTP
 // ======================
@@ -387,6 +508,14 @@ const renderTemplate = (template, mailVariables = {}) => {
 
 export const sendRawMail = async (mailOptions) => {
   try {
+    const httpResult = await sendWithHttpProvider(mailOptions);
+
+    if (httpResult) {
+      console.log(" Mail Sent:", httpResult.provider, httpResult.messageId || "");
+
+      return httpResult;
+    }
+
     const result = await getTransporter().sendMail({
       from: getFromAddress(),
       ...mailOptions,
