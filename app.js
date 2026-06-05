@@ -15,6 +15,8 @@ import errorMiddleware from "./middlewares/error.middleware.js";
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1);
+app.use(express.json());
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },

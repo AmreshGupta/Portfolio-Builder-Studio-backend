@@ -1,5 +1,7 @@
 import app from "./app.js";
 import connectDB from "./config/db.js";
+import path from "path";
+import express from "express";
 
 const PORT = process.env.PORT || 5000;
 
@@ -17,3 +19,4 @@ verifyMailTransport()
   .catch((err) => {
     console.error(err.message);
   });
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
